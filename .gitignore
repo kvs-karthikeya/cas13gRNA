@@ -1,0 +1,20 @@
+# secrets
+.env
+*.env
+!.env.example
+
+# python
+__pycache__/
+*.pyc
+*.log
+
+# node
+node_modules/
+
+# large local data (not needed to deploy)
+NONCODE_data/
+*.zip
+
+# OS files
+.DS_Store
+Thumbs.db
