@@ -52,10 +52,7 @@ RUN set -e; \
       echo "RNAstructure available"; \
     else \
       echo "RNAstructure unavailable; using ViennaRNA RNAfold fallback"; \
-    fi \
-    done; \
-    rm -f /tmp/rnastructure.tgz; \
-    test -x /opt/RNAstructure/exe/Fold || echo "WARNING: RNAstructure not installed; the app will use RNAfold"
+    fi
 
 ENV PATH="/opt/RNAstructure/exe:${PATH}"
 ENV DATAPATH="/opt/RNAstructure/data_tables"
