@@ -1,0 +1,1012 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Cas13 gRNA Designer</title>
+<meta name="description" content="Design Cas13 guide RNAs that target single-stranded RNA, checked against real PARS experiments where data exists.">
+<meta name="theme-color" content="#080808">
+
+<!-- 1. Where the backend lives. Change this to your Railway URL, e.g. https://your-app.up.railway.app (no trailing slash) -->
+<script>window.CAS13_API = 'http://localhost:5000';</script>
+
+<!-- 2. Apply the saved theme before first paint (no flash). Default is the black theme. -->
+<script>
+  try {
+    var saved = localStorage.getItem('cas13-theme');
+    document.documentElement.classList.toggle('dark', saved ? saved === 'dark' : true);
+  } catch (e) { document.documentElement.classList.add('dark'); }
+</script>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=Open+Sans:wght@400;600;700&display=swap" rel="stylesheet">
+<link href="https://cdn.jsdelivr.net/npm/aos@2.3.4/dist/aos.css" rel="stylesheet">
+<link rel="stylesheet" href="assets/tailwind.css">
+<link rel="stylesheet" href="assets/theme.css">
+</head>
+
+<body id="top">
+
+<!-- ═════════ TOP BAR ═════════ -->
+<header class="topbar">
+  <div class="max-w-6xl mx-auto px-5 h-16 flex items-center justify-between gap-4">
+    <a href="#top" class="flex items-center gap-3">
+      <svg class="hero-icon" width="26" height="26" viewBox="0 0 80 80" fill="none" stroke="currentColor" stroke-width="5" stroke-linecap="round" aria-hidden="true">
+        <path d="M28 72V36a12 12 0 0 1 24 0v36M28 48h24M28 60h24"/>
+      </svg>
+      <span class="brand">Cas13 gRNA Designer</span>
+    </a>
+    <div class="flex items-center gap-3">
+      <span id="serverStatus" class="server-status status-err"><span class="dot dot-err"></span> Checking...</span>
+      <button id="themeToggle" class="theme-btn" type="button" aria-label="Switch between the black and white theme" title="Switch theme">
+        <svg class="icon-sun" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>
+        <svg class="icon-moon" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>
+      </button>
+    </div>
+  </div>
+</header>
+
+<!-- ═════════ HERO ═════════ -->
+<section aria-labelledby="heroTitle">
+  <div class="max-w-4xl mx-auto px-6 pt-16 md:pt-24 pb-20 md:pb-28 text-center flex flex-col items-center">
+    <svg class="hero-icon mb-8" width="84" height="84" viewBox="0 0 80 80" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" aria-hidden="true" data-aos="zoom-in" data-aos-duration="900">
+      <path d="M28 72V36a12 12 0 0 1 24 0v36M28 46h24M28 56h24M28 66h24"/>
+      <circle cx="34" cy="30" r="1.6" fill="currentColor"/><circle cx="46" cy="30" r="1.6" fill="currentColor"/><circle cx="40" cy="25" r="1.6" fill="currentColor"/>
+    </svg>
+    <h1 id="heroTitle" class="glow-text text-4xl md:text-6xl font-bold tracking-tight leading-tight mb-6" data-aos="fade-up" data-aos-delay="120">
+      Find Cas13 guides that hit open RNA
+    </h1>
+    <p class="max-w-2xl text-base md:text-lg leading-relaxed mb-10" style="color:var(--fg-2)" data-aos="fade-up" data-aos-delay="240">
+      Paste an RNA sequence. The server folds it, finds the single-stranded loops, and ranks guides with the
+      scoring formula from Bandaru et al. 2020. Where real PARS experiments exist, every guide is checked against them.
+    </p>
+    <div class="flex flex-wrap justify-center gap-3 mb-12" data-aos="fade-up" data-aos-delay="360">
+      <span class="chip">Seed-aware design</span>
+      <span class="chip">LshCas13a, LwaCas13a, CasRx</span>
+      <span class="chip">Real PARS check</span>
+      <span class="chip">AI explanations</span>
+    </div>
+    <a href="#tool" class="btn" data-aos="fade-up" data-aos-delay="480">Enter</a>
+  </div>
+</section>
+
+<!-- ═════════ TOOL ═════════ -->
+<main id="tool" class="max-w-6xl mx-auto px-5 pb-24 space-y-6">
+
+  <!-- How to use: this really is a sequence of three steps -->
+  <div class="grid gap-4 md:grid-cols-3" data-aos="fade-up">
+    <div class="flex gap-3 items-start p-1">
+      <span class="step-num">1</span>
+      <div><h3 class="text-sm font-semibold">Paste a sequence</h3>
+        <p class="text-xs mt-1 leading-relaxed" style="color:var(--muted)">RNA or DNA, 28 to 20,000 nt. T is converted to U.</p></div>
+    </div>
+    <div class="flex gap-3 items-start p-1">
+      <span class="step-num">2</span>
+      <div><h3 class="text-sm font-semibold">Pick a tool and a Cas13 variant</h3>
+        <p class="text-xs mt-1 leading-relaxed" style="color:var(--muted)">The defaults match the 2020 paper.</p></div>
+    </div>
+    <div class="flex gap-3 items-start p-1">
+      <span class="step-num">3</span>
+      <div><h3 class="text-sm font-semibold">Read the ranked guides</h3>
+        <p class="text-xs mt-1 leading-relaxed" style="color:var(--muted)">Lower score is better. The banner says whether experiments back the result.</p></div>
+    </div>
+  </div>
+
+  <!-- SERVER WARNING -->
+  <div id="serverWarning" class="card hidden">
+    <div class="error">
+      <strong>The backend is not running.</strong> Start it in a terminal with
+      <code class="mono">python app_py_final.py</code>, then refresh this page.
+    </div>
+  </div>
+
+  <!-- INPUT CARD -->
+  <section class="card" data-aos="fade-up">
+    <h2>Input RNA sequence</h2>
+
+    <textarea id="seqInput" class="field" spellcheck="false"
+      placeholder="Paste an RNA or DNA sequence (A, U, G, C or T). T is converted to U. Up to 20,000 nt."></textarea>
+
+    <div class="mt-5">
+      <div class="sub-label">Load a test sequence</div>
+      <div class="flex flex-wrap gap-2">
+        <button class="btn sample-btn" type="button" onclick="loadSample(1)">Sample 1 · 40 nt</button>
+        <button class="btn sample-btn" type="button" onclick="loadSample(2)">Sample 2 · 80 nt</button>
+        <button class="btn sample-btn" type="button" onclick="loadSample(3)">Sample 3 · 120 nt</button>
+        <button class="btn sample-btn" type="button" onclick="loadSample(4)">XIST-like</button>
+        <button class="btn sample-btn" type="button" onclick="loadSample(5)">GAPDH fragment</button>
+        <button class="btn sample-btn" type="button" onclick="loadSample(6)">Hairpin test</button>
+      </div>
+    </div>
+
+    <!-- TOOL SELECTOR -->
+    <div class="mt-7">
+      <div class="sub-label">Structure prediction tool</div>
+      <div class="tool-selector">
+        <label class="tool-option sel-rf" id="lblRf">
+          <input type="radio" name="tool" value="rnafold" checked onchange="updateToolInfo()">
+          <div>
+            <div class="opt-name">ViennaRNA RNAfold</div>
+            <div class="opt-desc">Fast and widely used. Free-energy folding with base-pair probabilities.</div>
+          </div>
+        </label>
+        <label class="tool-option" id="lblRna">
+          <input type="radio" name="tool" value="rnastructure" onchange="updateToolInfo()">
+          <div>
+            <div class="opt-name">RNAstructure (Mathews Lab)</div>
+            <div class="opt-desc">The tool used in Bandaru et al. 2020. Falls back to RNAfold if it is not installed on the server.</div>
+          </div>
+        </label>
+      </div>
+      <div id="toolInfoBox" class="tool-info-box">
+        <strong>ViennaRNA RNAfold</strong> — MFE dynamic programming + McCaskill partition function.
+      </div>
+    </div>
+
+    <!-- VARIANT SELECTOR -->
+    <div class="mt-7">
+      <div class="sub-label">Cas13 variant</div>
+      <div class="variant-selector">
+        <label class="variant-option sel-lsh" id="lblLsh">
+          <input type="radio" name="variant" value="lshcas13a" checked onchange="updateVariantInfo()">
+          <div>
+            <div class="opt-name">LshCas13a</div>
+            <div class="opt-desc">28 nt · seed 11–18 · no PFS</div>
+            <div class="opt-note">Used in Bandaru 2020</div>
+          </div>
+        </label>
+        <label class="variant-option" id="lblLwa">
+          <input type="radio" name="variant" value="lwacas13a" onchange="updateVariantInfo()">
+          <div>
+            <div class="opt-name">LwaCas13a</div>
+            <div class="opt-desc">28 nt · seed 11–18 · non-G PFS</div>
+            <div class="opt-note">Alternative Cas13a ortholog</div>
+          </div>
+        </label>
+        <label class="variant-option" id="lblRfx">
+          <input type="radio" name="variant" value="rfxcas13d" onchange="updateVariantInfo()">
+          <div>
+            <div class="opt-name">RfxCas13d (CasRx)</div>
+            <div class="opt-desc">23 nt · 5' seed 1–6 · no PFS</div>
+            <div class="opt-note">Compact Cas13d variant</div>
+          </div>
+        </label>
+      </div>
+      <div id="variantInfoBox" class="variant-info-box">
+        <strong>LshCas13a</strong> — Exact variant used in Bandaru et al. 2020. 28nt spacer. Central seed positions 11-18. No PFS restriction.
+      </div>
+    </div>
+
+    <!-- SCORING EXPLANATION -->
+    <details class="formula-box" open>
+      <summary>How scoring works</summary>
+      <p class="mt-2">Score = 1 − { [a × (−1)] + [(28 − b) × (−0.5)] } &nbsp;=&nbsp; <code>1 + a + 0.5 × (28 − b)</code></p>
+      <p><strong>a</strong> is the number of bases in the guide's target window that pair in the predicted structure (double-stranded).
+         <strong>b</strong> is the spacer length. Lower is better; 1 is the best possible score.</p>
+      <p>Examples: a 28 nt guide with 0 paired bases scores 1. With 3 paired bases it scores 4. A 23 nt CasRx guide with 0 paired bases scores 3.5.</p>
+      <p>Seed rule: the central seed (positions 11–18, or 1–6 for CasRx) must be single-stranded. Guides that fail it are not shown.</p>
+    </details>
+
+    <div class="flex flex-wrap items-center gap-3 mt-7">
+      <button class="btn" type="button" onclick="runAnalysis()">Predict structure &amp; design guides</button>
+      <button class="btn clear-btn" type="button" onclick="clearAll()">Clear</button>
+    </div>
+    <div id="inputError" class="error hidden"></div>
+  </section>
+
+  <!-- LOADING -->
+  <div id="loadingDiv" class="card hidden">
+    <div class="loading">
+      <div class="spinner"></div>
+      <div id="loadingMsg">Running structure prediction...</div>
+      <div class="mt-2 text-xs" style="color:var(--faint)">Long sequences can take a few minutes.</div>
+    </div>
+  </div>
+
+  <!-- STRUCTURE CARD -->
+  <section id="structureCard" class="card hidden" data-aos="fade-up">
+    <h2>RNA secondary structure <small>Predicted without experimental constraints</small></h2>
+    <div class="legend">
+      <div class="legend-item"><div class="legend-box ss-vh"></div><span>Single-stranded &gt;90%</span></div>
+      <div class="legend-item"><div class="legend-box ss-h"></div><span>70–90%</span></div>
+      <div class="legend-item"><div class="legend-box ss-m"></div><span>50–70%</span></div>
+      <div class="legend-item"><div class="legend-box unc"></div><span>Uncertain</span></div>
+      <div class="legend-item"><div class="legend-box ds-m"></div><span>Double-stranded 30–50%</span></div>
+      <div class="legend-item"><div class="legend-box ds-h"></div><span>70–90%</span></div>
+      <div class="legend-item"><div class="legend-box ds-vh"></div><span>&gt;90%</span></div>
+    </div>
+    <div id="seqDisplay" class="seq-display"></div>
+    <div id="structDisplay" class="struct-display"></div>
+    <div id="energyDisplay" class="energy-display"></div>
+    <div id="toolUsedDisplay" class="tool-used-display"></div>
+    <div id="probHeatmap" class="prob-heatmap hidden">
+      <h3>Single-stranded probability, per nucleotide (hover for values)</h3>
+      <div id="heatmapRow" class="heatmap-row"></div>
+      <div class="mt-3 text-xs" style="color:var(--faint)">Brightest = reliably single-stranded · Darkest = reliably double-stranded.</div>
+    </div>
+    <div class="stats-row">
+      <div class="stat-box"><div class="num" id="statLen">-</div><div class="label">Length</div></div>
+      <div class="stat-box"><div class="num" id="statSS">-</div><div class="label">SS regions</div></div>
+      <div class="stat-box"><div class="num" id="statDS">-</div><div class="label">DS regions</div></div>
+      <div class="stat-box"><div class="num" id="statSSnt">-</div><div class="label">SS nucleotides</div></div>
+      <div class="stat-box"><div class="num" id="statDSnt">-</div><div class="label">DS nucleotides</div></div>
+      <div class="stat-box"><div class="num" id="statVariant">-</div><div class="label">Variant</div></div>
+    </div>
+    <div class="mt-6">
+      <div class="sub-label">Single-stranded regions that can host a guide</div>
+      <div id="ssRegionList" class="region-list"></div>
+    </div>
+  </section>
+
+  <!-- gRNA CARD -->
+  <section id="grnaCard" class="card hidden" data-aos="fade-up">
+    <h2>Designed gRNAs</h2>
+    <div id="evidenceBanner" class="hidden"></div>
+    <div id="grnaSuccess" class="success hidden"></div>
+    <div id="grnaWarning" class="warning hidden"></div>
+    <div id="grnaTableDiv"></div>
+    <div class="flex flex-wrap gap-3 mt-6">
+      <button class="btn secondary" type="button" onclick="downloadCSV()">Download CSV</button>
+      <button class="btn ai-btn" type="button" id="aiAgentBtn" onclick="runAIAgent()" style="display:none;">Run AI agent analysis</button>
+    </div>
+  </section>
+
+  <!-- AI AGENT CARD -->
+  <section id="aiAgentCard" class="ai-section hidden" data-aos="fade-up">
+    <h2>AI agent analysis <small>Groq AI · PARS check · Bandaru 2020 method</small></h2>
+
+    <div id="aiLoading" class="hidden text-center py-5" style="color:var(--muted)">
+      <span class="spinner-sm"></span>
+      <span id="aiLoadingMsg">Running the experimental check and AI analysis...</span>
+    </div>
+
+    <div id="aiAnalysisPanels" class="hidden">
+      <div class="ai-analysis-grid">
+        <div class="ai-panel"><h3>Structure analysis</h3><p id="aiStructureAnalysis"></p></div>
+        <div class="ai-panel"><h3>gRNA recommendation</h3><p id="aiGrnaRecommendation"></p></div>
+        <div class="ai-panel"><h3>PARS interpretation</h3><p id="aiParsInterpretation"></p></div>
+        <div class="ai-panel"><h3>Summary and next steps</h3><p id="aiSummary"></p></div>
+      </div>
+      <div id="parsStatusDiv" class="mb-4"></div>
+    </div>
+
+    <div id="chatSection" class="hidden">
+      <div class="sub-label mt-6 pt-5 border-t" style="border-color:var(--line)">Ask the AI agent about your results</div>
+      <div id="chatBox" class="chat-box"></div>
+      <div class="chat-input-row">
+        <input type="text" id="chatInput" class="chat-input"
+               placeholder="For example: why is guide 1 ranked highest?"
+               onkeypress="if(event.key==='Enter') sendChat()">
+        <button class="btn chat-send" type="button" id="chatSendBtn" onclick="sendChat()">Send</button>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<!-- ═════════ FOOTER ═════════ -->
+<footer class="border-t" style="border-color:var(--line)">
+  <div class="max-w-6xl mx-auto px-5 py-10 footer-note">
+    <p><strong style="color:var(--fg)">Method:</strong> Bandaru et al. 2020, <em>Structure-based design of gRNA for Cas13</em>, Sci Rep 10:11610.
+       <strong style="color:var(--fg)">Transcripts:</strong> NONCODE v6.
+       <strong style="color:var(--fg)">Experimental data:</strong> PARS, GEO GSE50676 (Wan et al. 2014), GM12878, RNA refolded in vitro.</p>
+    <p class="mt-2">Structure is predicted without experimental constraints and agrees only weakly with lab results on XIST.
+       Treat the ranking as a shortlist and test several top guides at the bench.</p>
+  </div>
+</footer>
+
+<script src="https://cdn.jsdelivr.net/npm/aos@2.3.4/dist/aos.js"></script>
+
+<!-- main application logic (unchanged behaviour) -->
+<script>
+
+const API = window.CAS13_API || 'http://localhost:5000';
+
+// ─── STATE ────────────────────────────────────────────────────────
+let currentResult    = null;
+let parsValidation   = null;
+let chatHistory      = [];
+let grnaData         = [];
+
+// ─── SAMPLES ──────────────────────────────────────────────────────
+const samples = {
+  1: "AUGCAUGCUAGCUAGCUAGCUAGCUAGCUAAGCUGCUA",
+  2: "AUGCAUGCUAGCUAGCUAGCUAGCUAGCUAAGCUGCUAGCUAGCUAGCUAGCUAGCUAGCUAGCUAGCUAGCUAGCUA",
+  3: "AUGCAUGCUAGCUAGCUAGCUAGCUAGCUAAGCUGCUAGCUAGCUAGCUAGCUAGCUAGCUAGCUAGCUAGCUAGCUAAUGCAUGCUAGCUAGCUAGCUAGCUAGCUAAGCUGCUA",
+  4: "GGCCAUGCAUGGCUAGCUAGCUUUUUUUUUUAUGCAUGCUAGCUAGCUAGCUAGCUAGCUAAGCUGCUAGCUAGCUAUGCAUGCUAGC",
+  5: "AUGGGUGUCGCCUUUGAGGUGCUGAGGAGCGAGAUCGCCCGCAUGGAGAAGGCCAAGGAGGAGCGAGAGCCAGCUGGGAUCAACGAUUUUGCUGGAGCUGAUUUCUGUGGUAUGACUCUGAGGAGUUCAACGGCACAGUCAAGGCUGAGAACGGGAAGCUUGUGCAUGACAGUGACAGCCAGCUCCAAGGCCAAGGUG",
+  6: "AUGCUUUUUUUUUUUUUUUUUUUUGCAUGCUUUUUUUUUUUUUUUUUUUUGCAUGCUUUUUUUUUUUUUUUUUUUUGCAU"
+};
+
+function loadSample(n) {
+  document.getElementById('seqInput').value = samples[n];
+  document.getElementById('inputError').classList.add('hidden');
+}
+
+function clearAll() {
+  document.getElementById('seqInput').value = '';
+  ['inputError','structureCard','grnaCard','loadingDiv','aiAgentCard']
+    .forEach(id => document.getElementById(id).classList.add('hidden'));
+  currentResult  = null;
+  parsValidation = null;
+  chatHistory    = [];
+  grnaData       = [];
+}
+
+// ─── TOOL SELECTOR ────────────────────────────────────────────────
+function updateToolInfo() {
+  const tool = document.querySelector('input[name="tool"]:checked').value;
+  const box  = document.getElementById('toolInfoBox');
+  const lblR = document.getElementById('lblRf');
+  const lblS = document.getElementById('lblRna');
+  lblR.className = 'tool-option';
+  lblS.className = 'tool-option';
+  if (tool === 'rnafold') {
+    lblR.className = 'tool-option sel-rf';
+    box.innerHTML = `<strong>ViennaRNA RNAfold</strong> — MFE dynamic programming + McCaskill partition function for base pair probabilities.`;
+  } else {
+    lblS.className = 'tool-option sel-rna';
+    box.innerHTML = `<strong>RNAstructure</strong> — Exact tool used in Bandaru et al. 2020. Partition function via partition + ProbabilityPlot commands.`;
+  }
+}
+
+// ─── VARIANT SELECTOR ─────────────────────────────────────────────
+const variantInfo = {
+  lshcas13a: {  text:`<strong>LshCas13a</strong> — Exact variant from Bandaru et al. 2020. 28nt spacer. Central seed positions 11-18. No PFS restriction in HEK293T cells.` },
+  lwacas13a: {  text:`<strong>LwaCas13a</strong> — Alternative Cas13a ortholog. 28nt spacer. Same central seed rule. Prefers non-G at 3' PFS. G-PFS gRNAs filtered out.` },
+  rfxcas13d: {  text:`<strong>RfxCas13d (CasRx)</strong> — Compact Cas13d. 23nt spacer. Seed at 5' end positions 1-6. No PFS requirement. Popular for in vivo mammalian applications.` }
+};
+
+function updateVariantInfo() {
+  const v    = document.querySelector('input[name="variant"]:checked').value;
+  const box  = document.getElementById('variantInfoBox');
+  const info = variantInfo[v];
+  ['lblLsh','lblLwa','lblRfx'].forEach(id => document.getElementById(id).className = 'variant-option');
+  const lblMap = {lshcas13a:'lblLsh', lwacas13a:'lblLwa', rfxcas13d:'lblRfx'};
+  const clsMap = {lshcas13a:'sel-lsh', lwacas13a:'sel-lwa', rfxcas13d:'sel-rfx'};
+  document.getElementById(lblMap[v]).className = `variant-option ${clsMap[v]}`;
+  box.innerHTML = info.text;
+}
+
+// ─── SERVER STATUS ────────────────────────────────────────────────
+async function checkServer() {
+  try {
+    const resp = await fetch(`${API}/`, {signal: AbortSignal.timeout(3000)});
+    if (resp.ok) {
+      const data = await resp.json();
+      const rf   = data.tools?.RNAfold      === 'available';
+      const rna  = data.tools?.RNAstructure === 'available';
+      const ai   = data.ai_agent            === 'available';
+      const db   = data.database            === 'connected';
+      document.getElementById('serverStatus').className = 'server-status status-ok';
+      document.getElementById('serverStatus').innerHTML =
+        `<span class="dot dot-ok"></span> Online | RF:${rf?'✓':'✗'} | RS:${rna?'✓':'✗'} | AI:${ai?'✓':'✗'} | DB:${db?'✓':'✗'}`;
+      document.getElementById('serverWarning').classList.add('hidden');
+    } else { throw new Error(); }
+  } catch {
+    document.getElementById('serverStatus').className = 'server-status status-err';
+    document.getElementById('serverStatus').innerHTML = '<span class="dot dot-err"></span> Offline';
+    document.getElementById('serverWarning').classList.remove('hidden');
+  }
+}
+checkServer();
+setInterval(checkServer, 10000);
+
+// ─── MAIN ANALYSIS ────────────────────────────────────────────────
+async function runAnalysis() {
+  const raw     = document.getElementById('seqInput').value
+                    .trim().toUpperCase().replace(/\s/g,'').replace(/T/g,'U');
+  const tool    = document.querySelector('input[name="tool"]:checked').value;
+  const variant = document.querySelector('input[name="variant"]:checked').value;
+  const errDiv  = document.getElementById('inputError');
+
+  if (!raw)                 { showError('Please paste an RNA or DNA sequence.'); return; }
+  if (/[^AUGC]/.test(raw)) { showError('Invalid characters. Only A, U, G, C or T allowed.'); return; }
+  if (raw.length < 28)     { showError('Sequence too short. Minimum 28 nucleotides.'); return; }
+  if (raw.length > 20000)  { showError('Sequence too long. Maximum 20,000 nucleotides.'); return; }
+
+  errDiv.classList.add('hidden');
+  ['structureCard','grnaCard','aiAgentCard'].forEach(id =>
+    document.getElementById(id).classList.add('hidden'));
+  document.getElementById('loadingDiv').classList.remove('hidden');
+
+  const varName = variant==='lshcas13a'?'LshCas13a':variant==='lwacas13a'?'LwaCas13a':'RfxCas13d';
+  const seqLen = raw.length;
+  let loadMsg;
+  if (seqLen < 1000) {
+    loadMsg = `Running full structure prediction + ${varName} gRNA design...`;
+  } else if (seqLen <= 5000) {
+    loadMsg = `Running windowed prediction (200nt windows) + ${varName} gRNA design...`;
+  } else {
+    loadMsg = `Running LinearFold O(n) — optimized for ${seqLen.toLocaleString()}nt + ${varName} gRNA design...`;
+  }
+  document.getElementById('loadingMsg').textContent = loadMsg;
+
+  try {
+    const resp   = await fetch(`${API}/analyze`, {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({sequence: raw, tool, variant})
+    });
+    const result = await resp.json();
+    if (!resp.ok) { showError(result.error || 'Server error.'); return; }
+
+    currentResult  = result;
+    parsValidation = result.pars_validation || null;
+    document.getElementById('loadingDiv').classList.add('hidden');
+    renderStructure(result);
+    renderGRNAs(result);
+    renderEvidence(result);
+
+  } catch(e) {
+    showError('Cannot connect to backend. Make sure Python server is running: python app_py_final.py');
+  }
+}
+
+// ─── AI AGENT ─────────────────────────────────────────────────────
+async function runAIAgent() {
+  if (!currentResult) return;
+
+  const aiCard = document.getElementById('aiAgentCard');
+  aiCard.classList.remove('hidden');
+  document.getElementById('aiLoading').classList.remove('hidden');
+  document.getElementById('aiAnalysisPanels').classList.add('hidden');
+  document.getElementById('chatSection').classList.add('hidden');
+  document.getElementById('aiLoadingMsg').textContent =
+    'Validating gRNAs against PARS database...';
+
+  // Scroll to AI card
+  aiCard.scrollIntoView({behavior: 'smooth'});
+
+  try {
+    // Step 1: Call AI agent
+    document.getElementById('aiLoadingMsg').textContent =
+      'Running PARS validation + Groq AI analysis...';
+
+    const resp = await fetch(`${API}/ai_agent`, {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({
+        sequence:  currentResult.sequence,
+        structure: currentResult.structure,
+        grnas:     currentResult.grnas,
+        regions:   currentResult.regions,
+        variant:   currentResult.variant,
+        energy:    currentResult.energy,
+        stats:     currentResult.stats
+      })
+    });
+
+    const agentResult = await resp.json();
+    if (!resp.ok) {
+      showAIError(agentResult.error || 'AI agent error');
+      return;
+    }
+
+    parsValidation = agentResult.pars_validation;
+
+    // Render AI analysis
+    renderAIAnalysis(agentResult);
+
+    // Update gRNA table with PARS validation
+    if (parsValidation && parsValidation.status === 'success') {
+      updateTableWithPARS(parsValidation);
+    }
+
+    // Show chat
+    document.getElementById('chatSection').classList.remove('hidden');
+    addChatMessage('agent',
+      `I have analyzed your ${currentResult.stats.grnas_found} gRNA candidates using both computational structure prediction and PARS experimental data. ` +
+      `Ask me anything about the results!`
+    );
+
+  } catch(e) {
+    showAIError(`Error: ${e.message}`);
+  } finally {
+    document.getElementById('aiLoading').classList.add('hidden');
+  }
+}
+
+function renderAIAnalysis(agentResult) {
+  const analysis = agentResult.ai_analysis || {};
+  const pars     = agentResult.pars_validation || {};
+
+  document.getElementById('aiStructureAnalysis').textContent =
+    analysis.structure_analysis  || 'Analysis not available.';
+  document.getElementById('aiGrnaRecommendation').textContent =
+    analysis.grna_recommendation || 'Recommendation not available.';
+  document.getElementById('aiParsInterpretation').textContent =
+    analysis.pars_interpretation || 'PARS interpretation not available.';
+  document.getElementById('aiSummary').textContent =
+    analysis.summary             || 'Summary not available.';
+
+  // PARS status
+  const parsDiv = document.getElementById('parsStatusDiv');
+  if (pars.status === 'success') {
+    const confirmed   = Object.values(pars.grnas || {}).filter(g=>g.status==='confirmed').length;
+    const partial     = Object.values(pars.grnas || {}).filter(g=>g.status==='partial').length;
+    const contradicted= Object.values(pars.grnas || {}).filter(g=>g.status==='contradicted').length;
+    const nodata      = Object.values(pars.grnas || {}).filter(g=>g.status==='no_data'||g.status==='inconclusive').length;
+    const ds = pars.dataset || {};
+    const cr = pars.criteria || {};
+    parsDiv.innerHTML = `
+      <div class="note">
+        <div class="note-title">
+          Experimental check (PARS) — ${pars.transcript?.gene_name || ''} (${pars.transcript?.noncode_id || ''})
+        </div>
+        <div class="pars-badge-row">
+          <span class="pars-confirmed">✓ Confirmed: ${confirmed}</span>
+          <span class="pars-partial">~ Partial: ${partial}</span>
+          <span class="pars-contradicted">✗ Contradicted: ${contradicted}</span>
+          <span class="pars-nodata">No data / inconclusive: ${nodata}</span>
+        </div>
+        <div class="note-body">
+          Data: ${ds.method || ''} · ${ds.cell_type || ''} · ${ds.probing_condition || ''} · ${ds.citation || ''}<br>
+          Rule: positions need ≥${cr.min_reads} reads; single-stranded if score ≤ ${cr.ss_cutoff}, double-stranded if ≥ ${cr.ds_cutoff}; at least ${cr.min_seed_covered} seed positions must have data.
+        </div>
+        <div class="note-body">
+          ${pars.message}
+        </div>
+      </div>`;
+  } else {
+    parsDiv.innerHTML = `
+      <div class="note">
+        PARS validation: ${pars.message || 'Sequence not found in NONCODE database. Computational prediction only.'}
+      </div>`;
+  }
+
+  document.getElementById('aiAnalysisPanels').classList.remove('hidden');
+}
+
+function updateTableWithPARS(pars) {
+  // The table now reads parsValidation itself, keyed by each gRNA's own rank,
+  // so badges stay correct after sorting. Just re-render.
+  renderTable(grnaData);
+}
+
+function parsBadgeFor(g) {
+  const pv = parsValidation;
+  if (!pv || !pv.status) {
+    return '<span class="pars-nodata" title="Click Run AI Agent to validate against PARS data">not run</span>';
+  }
+  if (pv.status === 'no_match') {
+    return '<span class="pars-nodata" title="' + (pv.message || 'No matching transcript') + '">computational only</span>';
+  }
+  if (pv.status !== 'success') {
+    return '<span class="pars-nodata" title="' + (pv.message || 'Validation unavailable') + '">unavailable</span>';
+  }
+  const val = pv.grnas && pv.grnas[g.rank];
+  if (!val) return '<span class="pars-nodata" title="Not validated">?</span>';
+  const cls = val.status==='confirmed'?'pars-confirmed':
+              val.status==='partial'?'pars-partial':
+              val.status==='contradicted'?'pars-contradicted':'pars-nodata';
+  const txt = val.status==='confirmed'?'✓ PARS':
+              val.status==='partial'?'~ PARS':
+              val.status==='contradicted'?'✗ PARS':
+              val.status==='inconclusive'?'inconclusive':'no data';
+  return '<span class="' + cls + '" title="' + (val.message || '') + '">' + txt + '</span>';
+}
+
+function litBadgeFor(g) {
+  const lit = parsValidation && parsValidation.literature ? parsValidation.literature[g.rank] : null;
+  if (!lit) return '<span class="pars-nodata">—</span>';
+  let out = '';
+  if (lit.tested) {
+    const t = lit.tested;
+    const cls = t.seed_ss_nt === 8 ? 'pars-confirmed' : t.seed_ss_nt === 0 ? 'pars-contradicted' : 'pars-partial';
+    const txt = t.seed_ss_nt === 8 ? 'tested ✓' : t.seed_ss_nt === 0 ? 'tested ✗' : 'tested ~';
+    out += `<span class="${cls}" title="${t.guide}: ${t.seed_class}. Paper class mean relative XIST expression ${t.class_mean_relative_expression} (lower = stronger knockdown). Per-guide values are not published.">${txt}</span> `;
+  }
+  if (lit.in_paper_ss_region) out += '<span class="pars-partial" title="Seed lies inside a single-stranded region listed in Bandaru et al. 2020">paper SS region</span>';
+  return out || '<span class="pars-nodata">—</span>';
+}
+
+function renderEvidence(result) {
+  const box = document.getElementById('evidenceBanner');
+  const ev  = result.evidence;
+  if (!ev) { box.classList.add('hidden'); return; }
+  const pv = result.pars_validation || {};
+  const exp = ev.tier === 'experimental_data_available';
+  const c = ev.counts || {};
+  let html = `<div class="evidence ${exp?'evidence-exp':'evidence-pred'}">`;
+  html += `<strong>${exp ? 'Experimentally checked' : 'Predicted only'}</strong> — ${ev.label}`;
+  if (exp) {
+    const tr = pv.transcript || {};
+    html += `<br>Data: ${ev.dataset}.`;
+    html += `<br>Result for all ${result.stats.grnas_found} candidates: confirmed ${c.confirmed||0}, partial ${c.partial||0}, inconclusive ${c.inconclusive||0}, contradicted ${c.contradicted||0}, no data ${c.no_data||0}.`;
+    if (tr.offset > 0) html += `<br>Your sequence starts at position ${tr.offset+1} of ${tr.gene_name}. Transcript position = shown position + ${tr.offset}.`;
+    const sm = pv.summary || {};
+    if (sm.literature_tested || sm.in_paper_ss_region) html += `<br>Bandaru et al. 2020: ${sm.literature_tested||0} of these guides were tested in the lab; ${sm.in_paper_ss_region||0} have their seed inside a single-stranded region from that paper.`;
+  }
+  const src = result.stats.probability_source;
+  html += `<br><span class="muted-text">Structure: ${result.tool_used}. Seed confidence from: ${src || 'not available'}.</span>`;
+  html += '</div>';
+  box.innerHTML = html;
+  box.classList.remove('hidden');
+}
+
+function slimPars() {
+  const pv = parsValidation;
+  if (!pv || !pv.status) return {};
+  const keep = Object.keys(pv.grnas || {}).slice(0, 20);
+  const slim = {status: pv.status, message: pv.message, transcript: pv.transcript, dataset: pv.dataset,
+                criteria: pv.criteria, summary: pv.summary, grnas: {}, literature: {}};
+  keep.forEach(k => { slim.grnas[k] = pv.grnas[k]; if (pv.literature && pv.literature[k]) slim.literature[k] = pv.literature[k]; });
+  return slim;
+}
+
+function parsTextFor(g) {
+  const pv = parsValidation;
+  if (!pv || !pv.status) return 'not run';
+  if (pv.status === 'no_match') return 'computational only';
+  if (pv.status !== 'success') return 'unavailable';
+  const val = pv.grnas && pv.grnas[g.rank];
+  return val ? val.status : 'not validated';
+}
+
+function showAIError(msg) {
+  document.getElementById('aiLoading').classList.add('hidden');
+  document.getElementById('aiAnalysisPanels').classList.remove('hidden');
+  document.getElementById('aiStructureAnalysis').textContent = msg;
+  document.getElementById('aiGrnaRecommendation').textContent = '';
+  document.getElementById('aiParsInterpretation').textContent = '';
+  document.getElementById('aiSummary').textContent = '';
+}
+
+// ─── CHAT ─────────────────────────────────────────────────────────
+async function sendChat() {
+  const input   = document.getElementById('chatInput');
+  const sendBtn = document.getElementById('chatSendBtn');
+  const question = input.value.trim();
+  if (!question || !currentResult) return;
+
+  addChatMessage('user', question);
+  chatHistory.push({role: 'user', content: question});
+  input.value   = '';
+  sendBtn.disabled = true;
+
+  // Typing indicator
+  const typingId = addChatMessage('agent', '...', true);
+
+  try {
+    const resp = await fetch(`${API}/ai_chat`, {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({
+        question,
+        sequence:        currentResult.sequence,
+        structure:       currentResult.structure,
+        grnas:           currentResult.grnas,
+        regions:         currentResult.regions,
+        variant:         currentResult.variant,
+        pars_validation: slimPars(),
+        chat_history:    chatHistory
+      })
+    });
+
+    const data = await resp.json();
+    const answer = data.answer || 'Could not get response.';
+
+    // Remove typing indicator and add real answer
+    removeMessage(typingId);
+    addChatMessage('agent', answer);
+    chatHistory.push({role: 'agent', content: answer});
+
+  } catch(e) {
+    removeMessage(typingId);
+    addChatMessage('agent', 'Error connecting to AI agent. Check that app.py is running.');
+  } finally {
+    sendBtn.disabled = false;
+    input.focus();
+  }
+}
+
+let msgCounter = 0;
+function addChatMessage(role, content, isTyping=false) {
+  const chatBox = document.getElementById('chatBox');
+  const msgId   = `msg-${++msgCounter}`;
+  const msg     = document.createElement('div');
+  msg.id        = msgId;
+  msg.className = `chat-msg ${role}`;
+
+  const sender  = role==='user' ? 'You' : role==='agent' ? 'AI Agent' : 'System';
+  msg.innerHTML = `<div class="sender">${sender}</div>${isTyping ? '<span class="spinner-sm"></span> Thinking...' : content}`;
+
+  chatBox.appendChild(msg);
+  chatBox.scrollTop = chatBox.scrollHeight;
+  return msgId;
+}
+
+function removeMessage(msgId) {
+  const el = document.getElementById(msgId);
+  if (el) el.remove();
+}
+
+// ─── RENDER STRUCTURE ─────────────────────────────────────────────
+function renderStructure(result) {
+  const {sequence, structure, energy, tool_used, regions, stats, unpaired_probs} = result;
+  const hasProbs = stats.has_probs && Object.keys(unpaired_probs).length > 0;
+  const DISPLAY_LIMIT = 2000;
+  const displayLen = Math.min(sequence.length, DISPLAY_LIMIT);
+
+  let html = '';
+  for (let i = 0; i < displayLen; i++) {
+    const prob = hasProbs ? (unpaired_probs[String(i)] ?? 0.5) : null;
+    const cls  = hasProbs ? getColorClass(prob) : (structure[i]==='.'?'ss-noprob':'ds-noprob');
+    const tip  = hasProbs ? `pos ${i+1} | unpaired: ${(prob*100).toFixed(1)}%` : `pos ${i+1}`;
+    html += `<span class="nt ${cls}" title="${tip}">${sequence[i]}</span>`;
+    if ((i+1)%10===0 && i<displayLen-1) html += ' ';
+  }
+  if (sequence.length > DISPLAY_LIMIT) {
+    html += `<span style="color:var(--muted);font-size:12px;margin-left:8px;">
+      ... [Showing first ${DISPLAY_LIMIT.toLocaleString()} of ${sequence.length.toLocaleString()} nucleotides — full sequence used for gRNA design]
+    </span>`;
+  }
+  document.getElementById('seqDisplay').innerHTML = html;
+
+  let sHtml = '';
+  const structDisplayLen = Math.min(structure.length, DISPLAY_LIMIT);
+  for (let i=0; i<structDisplayLen; i++) {
+    sHtml += structure[i];
+    if ((i+1)%10===0 && i<structDisplayLen-1) sHtml += ' ';
+  }
+  if (structure.length > DISPLAY_LIMIT) sHtml += ' ...';
+  document.getElementById('structDisplay').textContent = sHtml;
+
+  document.getElementById('energyDisplay').innerHTML =
+    `Minimum Free Energy: <span>${energy} kcal/mol</span>`;
+  document.getElementById('toolUsedDisplay').innerHTML =
+    `Tool: <span>${tool_used}</span>` +
+    (hasProbs
+      ? ' | <span style="color:var(--fg);">✓ Probabilities calculated</span>'
+      : ' | <span style="color:var(--muted);">MFE only</span>');
+
+  if (hasProbs) {
+    const rowDiv = document.getElementById('heatmapRow');
+    rowDiv.innerHTML = '';
+    const heatmapLen = Math.min(sequence.length, DISPLAY_LIMIT);
+    for (let i=0; i<heatmapLen; i++) {
+      const prob = unpaired_probs[String(i)] ?? 0.5;
+      const cell = document.createElement('div');
+      cell.className = 'hm-cell';
+      cell.style.background = getHeatmapColor(prob);
+      cell.title = `pos ${i+1} (${sequence[i]}) | unpaired: ${(prob*100).toFixed(1)}%`;
+      rowDiv.appendChild(cell);
+    }
+    document.getElementById('probHeatmap').classList.remove('hidden');
+  } else {
+    document.getElementById('probHeatmap').classList.add('hidden');
+  }
+
+  document.getElementById('statLen').textContent     = stats.length;
+  document.getElementById('statSS').textContent      = stats.ss_regions;
+  document.getElementById('statDS').textContent      = stats.ds_regions;
+  document.getElementById('statSSnt').textContent    = stats.ss_nucleotides;
+  document.getElementById('statDSnt').textContent    = stats.ds_nucleotides;
+  document.getElementById('statVariant').textContent = stats.variant_name;
+
+  const ssListDiv = document.getElementById('ssRegionList');
+  ssListDiv.innerHTML = '';
+  if (regions.ss.length === 0) {
+    ssListDiv.innerHTML = '<span style="color:var(--muted);font-size:13px;">No SS regions found</span>';
+  } else {
+    regions.ss.forEach(r => {
+      const tag = document.createElement('span');
+      tag.className = 'region-tag ss-tag';
+      let confBadge = '';
+      if (r.confidence !== null && r.confidence !== undefined) {
+        const lbl = r.confidence_label;
+        const cls = lbl==='Very High'?'conf-vh':lbl==='High'?'conf-h':lbl==='Medium'?'conf-m':lbl==='Low'?'conf-l':'conf-vl';
+        confBadge = `<span class="conf-badge ${cls}">${r.confidence}%</span>`;
+      }
+      tag.innerHTML = `pos ${r.start_display}–${r.end_display} (${r.length}nt) ${confBadge}`;
+      ssListDiv.appendChild(tag);
+    });
+  }
+
+  document.getElementById('structureCard').classList.remove('hidden');
+}
+
+// ─── COLOR HELPERS ────────────────────────────────────────────────
+function getColorClass(p) {
+  if (p >= 0.90) return 'ss-vh';
+  if (p >= 0.70) return 'ss-h';
+  if (p >= 0.50) return 'ss-m';
+  if (p >= 0.40) return 'unc';
+  if (p >= 0.30) return 'ds-m';
+  if (p >= 0.10) return 'ds-h';
+  return 'ds-vh';
+}
+
+function getHeatmapColor(p) {
+  // single-stranded probability -> grayscale; the most single-stranded cells contrast most with the page
+  const dark = document.documentElement.classList.contains('dark');
+  const t = Math.max(0, Math.min(1, p));
+  const L = dark ? 10 + t * 88 : 92 - t * 88;
+  return 'hsl(0, 0%, ' + L.toFixed(1) + '%)';
+}
+
+// ─── RENDER gRNAs ─────────────────────────────────────────────────
+function renderGRNAs(result) {
+  const {grnas, regions, stats} = result;
+  grnaData = grnas;
+
+  const card       = document.getElementById('grnaCard');
+  const tableDiv   = document.getElementById('grnaTableDiv');
+  const successDiv = document.getElementById('grnaSuccess');
+  const warnDiv    = document.getElementById('grnaWarning');
+  const aiBtn      = document.getElementById('aiAgentBtn');
+
+  card.classList.remove('hidden');
+  successDiv.classList.add('hidden');
+  warnDiv.classList.add('hidden');
+  tableDiv.innerHTML = '';
+  aiBtn.style.display = 'none';
+
+  if (grnas.length === 0) {
+    const maxSS = regions.ss.length > 0 ? Math.max(...regions.ss.map(r=>r.length)) : 0;
+    let reason = '';
+    if (regions.ss.length === 0) {
+      reason = 'No SS regions found.';
+    } else if (maxSS < (stats.spacer_length===23?6:8)) {
+      reason = `Largest SS region is only <strong>${maxSS}nt</strong>. Seed region needs ${stats.spacer_length===23?6:8} consecutive SS positions.<br>
+        SS regions: ${regions.ss.map(r=>`pos ${r.start_display}-${r.end_display} (${r.length}nt)`).join(', ')}`;
+    } else {
+      reason = 'No valid window found where seed falls entirely within one SS region.';
+    }
+    warnDiv.innerHTML = `
+      <strong>No valid gRNAs designed</strong><br><br>
+      <strong>Reason:</strong> ${reason}<br><br>
+      <strong>Suggestions:</strong><br>
+      • Try longer sequence (80nt+)<br>
+      • Try Hairpin test or GAPDH sample<br>
+      • Switch Cas13 variant or prediction tool<br>
+      • Use SHAPE/PARS experimental data
+    `;
+    warnDiv.classList.remove('hidden');
+    return;
+  }
+
+  successDiv.innerHTML =
+    `✅ Found <strong>${grnas.length}</strong> valid gRNA candidates for <strong>${stats.variant_name}</strong>. ` +
+    `Faculty scoring formula applied. <strong>Lower score = better.</strong> Click "Run AI Agent" for PARS validation and expert analysis.`;
+  successDiv.classList.remove('hidden');
+
+  renderTable(grnas);
+
+  // Show AI agent button
+  aiBtn.style.display = 'inline-block';
+}
+
+function renderTable(grnas) {
+  const tableDiv = document.getElementById('grnaTableDiv');
+  const hasProbs = grnas[0]?.seed_confidence !== null && grnas[0]?.seed_confidence !== undefined;
+  const hasLit   = !!(parsValidation && parsValidation.literature && Object.keys(parsValidation.literature).length);
+
+  let html = `<table><thead><tr>
+    <th onclick="sortBy('rank')">Rank ↕</th>
+    <th onclick="sortBy('grna')">gRNA Sequence (5'→3') ↕</th>
+    <th onclick="sortBy('position_start')">Target Pos ↕</th>
+    <th onclick="sortBy('ss_percent')">SS% ↕</th>
+    <th onclick="sortBy('ds_nucleotides')">DS nt ↕</th>
+    ${hasProbs?'<th onclick="sortBy(\'seed_confidence\')">Seed Conf ↕</th>':'<th title="Needs base-pair probabilities (not available above 5,000 nt)">Seed Conf</th>'}
+    <th onclick="sortBy('faculty_score')">Score ↕ ▲</th>
+    <th>Target Loop</th>
+    <th>PFS</th>
+    <th>PARS</th>
+    ${hasLit?'<th title="Guides tested, or single-stranded regions found, in Bandaru et al. 2020 (XIST)">Paper</th>':''}
+  </tr></thead><tbody>`;
+
+  grnas.slice(0,50).forEach(g => {
+    const rc  = g.rank===1?'rank-1':g.rank===2?'rank-2':g.rank===3?'rank-3':'';
+    const em  = '';
+    const bw  = Math.round(g.ss_percent*0.7);
+    const cb  = hasProbs&&g.seed_confidence?Math.round(g.seed_confidence*0.7):0;
+    const scCls = g.faculty_score<=3?'score-good':g.faculty_score<=7?'score-med':'score-low';
+    const pfsBadge = g.pfs_note==='N/A'
+      ? `<span class="pfs-badge pfs-na">N/A</span>`
+      : `<span class="pfs-badge pfs-ok" title="${g.pfs_note}">✓</span>`;
+
+    html += `<tr>
+      <td class="${rc}">${em} ${g.rank}</td>
+      <td class="mono" style="font-size:12px;letter-spacing:1px;">${g.grna}</td>
+      <td class="mono">${g.position_start}–${g.position_end}</td>
+      <td><div class="score-bar"><div class="bar" style="width:${bw}px;"></div><span>${g.ss_percent}%</span></div></td>
+      <td class="mono" style="color:var(--muted);">${g.ds_nucleotides}</td>
+      ${hasProbs?`<td><div class="score-bar"><div class="conf-bar" style="width:${cb}px;"></div><span>${g.seed_confidence!=null?g.seed_confidence+'%':'N/A'}</span></div></td>`:'<td style="color:var(--muted);">N/A</td>'}
+      <td><span class="${scCls}">${g.faculty_score}</span></td>
+      <td style="font-size:11px;color:var(--muted);">${g.target_loop}</td>
+      <td>${pfsBadge}</td>
+      <td>${parsBadgeFor(g)}</td>
+      ${hasLit?`<td>${litBadgeFor(g)}</td>`:''}
+    </tr>`;
+  });
+
+  html += '</tbody></table>';
+  if (grnas.length>50) html += `<div style="color:var(--muted);font-size:12px;margin-top:8px;">Showing top 50 of ${grnas.length}. Download CSV for full list.</div>`;
+  if (!hasProbs) html += `<div style="color:var(--muted);font-size:12px;margin-top:8px;">Seed confidence is N/A because no unpaired probabilities could be computed for this input (RNAplfold missing or failed). The faculty score is unaffected.</div>`;
+  tableDiv.innerHTML = html;
+}
+
+// ─── SORT ─────────────────────────────────────────────────────────
+let sortDir = {};
+function sortBy(col) {
+  sortDir[col] = !sortDir[col];
+  grnaData.sort((a,b) => {
+    if (typeof a[col]==='string') return sortDir[col]?a[col].localeCompare(b[col]):b[col].localeCompare(a[col]);
+    return sortDir[col]?a[col]-b[col]:b[col]-a[col];
+  });
+  renderTable(grnaData);
+}
+
+// ─── CSV ──────────────────────────────────────────────────────────
+function downloadCSV() {
+  if (!grnaData.length) return;
+  const q = s => '"' + String(s).replace(/"/g, '""') + '"';
+  const off = parsValidation && parsValidation.transcript ? (parsValidation.transcript.offset || 0) : 0;
+  let csv = 'Rank,gRNA Sequence,Target Start,Target End,Transcript Start,Transcript End,SS%,DS nt,Seed Conf%,Faculty Score,Target Loop,PFS Note,PARS Status,PARS Seed Avg,PARS Seed Positions With Data,PARS Seed Positions Total,Paper Evidence\n';
+  grnaData.forEach(g => {
+    const val = parsValidation && parsValidation.grnas ? parsValidation.grnas[g.rank] : null;
+    const lit = parsValidation && parsValidation.literature ? parsValidation.literature[g.rank] : null;
+    const seedAvg = val && val.seed_pars_avg != null ? val.seed_pars_avg : '';
+    const have  = val && val.seed_positions_total != null ? val.seed_positions_scored : '';
+    const total = val && val.seed_positions_total != null ? val.seed_positions_total : '';
+    let paper = '';
+    if (lit && lit.tested) paper += 'tested (' + lit.tested.seed_class + ')';
+    if (lit && lit.in_paper_ss_region) paper += (paper ? '; ' : '') + 'seed in paper SS region';
+    csv += [g.rank, q(g.grna), g.position_start, g.position_end, g.position_start+off, g.position_end+off,
+            g.ss_percent, g.ds_nucleotides,
+            (g.seed_confidence != null ? g.seed_confidence : 'N/A'), g.faculty_score,
+            q(g.target_loop), q(g.pfs_note), q(parsTextFor(g)), seedAvg, have, total, q(paper)].join(',') + '\n';
+  });
+  const blob = new Blob([csv],{type:'text/csv'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'cas13_grnas.csv';
+  a.click();
+}
+
+// ─── ERROR ────────────────────────────────────────────────────────
+function showError(msg) {
+  const div = document.getElementById('inputError');
+  div.textContent = msg;
+  div.classList.remove('hidden');
+  document.getElementById('loadingDiv').classList.add('hidden');
+}
+
+</script>
+
+<!-- theme toggle + animations -->
+<script>
+(function () {
+  var root = document.documentElement;
+
+  document.getElementById('themeToggle').addEventListener('click', function () {
+    var dark = root.classList.toggle('dark');
+    try { localStorage.setItem('cas13-theme', dark ? 'dark' : 'light'); } catch (e) {}
+    var meta = document.querySelector('meta[name="theme-color"]');
+    if (meta) meta.setAttribute('content', dark ? '#080808' : '#ffffff');
+    // re-draw the heatmap so its grays match the new theme
+    try { if (typeof currentResult !== 'undefined' && currentResult) renderStructure(currentResult); } catch (e) {}
+  });
+
+  var reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  if (window.AOS) AOS.init({ duration: 700, easing: 'ease-out-cubic', once: true, offset: 40, disable: reduce });
+
+  // cards that are revealed after an analysis finish need AOS to re-measure the page
+  var timer;
+  new MutationObserver(function (list) {
+    for (var i = 0; i < list.length; i++) {
+      var m = list[i];
+      if (m.oldValue && /(^|\s)hidden(\s|$)/.test(m.oldValue) && !m.target.classList.contains('hidden')) {
+        clearTimeout(timer);
+        timer = setTimeout(function () { if (window.AOS) AOS.refreshHard(); }, 60);
+        break;
+      }
+    }
+  }).observe(document.body, { subtree: true, attributes: true, attributeFilter: ['class'], attributeOldValue: true });
+})();
+</script>
+</body>
+</html>
