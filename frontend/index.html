@@ -8,7 +8,7 @@
 <meta name="theme-color" content="#080808">
 
 <!-- 1. Where the backend lives. Change this to your Railway URL, e.g. https://your-app.up.railway.app (no trailing slash) -->
-<script>window.CAS13_API = 'https://cas13grna-production.up.railway.app';</script>
+<script>window.CAS13_API = 'http://localhost:5000';</script>
 
 <!-- 2. Apply the saved theme before first paint (no flash). Default is the black theme. -->
 <script>
@@ -32,9 +32,15 @@
 <header class="topbar">
   <div class="max-w-6xl mx-auto px-5 h-16 flex items-center justify-between gap-4">
     <a href="#top" class="flex items-center gap-3">
-      <svg class="hero-icon" width="26" height="26" viewBox="0 0 80 80" fill="none" stroke="currentColor" stroke-width="5" stroke-linecap="round" aria-hidden="true">
-        <path d="M28 72V36a12 12 0 0 1 24 0v36M28 48h24M28 60h24"/>
-      </svg>
+      <svg class="hero-icon" width="26" height="26" viewBox="0 0 40 40"
+     fill="none" aria-hidden="true">
+  <rect width="40" height="40" rx="10" fill="#0F172A"/>
+  <path d="M12 29V17C12 12.58 15.58 9 20 9C24.42 9 28 12.58 28 17V24"
+        stroke="#06B6D4" stroke-width="3" stroke-linecap="round"/>
+  <path d="M15 18H25M15 23H25"
+        stroke="#38BDF8" stroke-width="2" stroke-linecap="round"/>
+  <circle cx="28" cy="29" r="3.5" fill="#F43F5E"/>
+</svg>
       <span class="brand">Cas13 gRNA Designer</span>
     </a>
     <div class="flex items-center gap-3">
@@ -50,10 +56,15 @@
 <!-- ═════════ HERO ═════════ -->
 <section aria-labelledby="heroTitle">
   <div class="max-w-4xl mx-auto px-6 pt-16 md:pt-24 pb-20 md:pb-28 text-center flex flex-col items-center">
-    <svg class="hero-icon mb-8" width="84" height="84" viewBox="0 0 80 80" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" aria-hidden="true" data-aos="zoom-in" data-aos-duration="900">
-      <path d="M28 72V36a12 12 0 0 1 24 0v36M28 46h24M28 56h24M28 66h24"/>
-      <circle cx="34" cy="30" r="1.6" fill="currentColor"/><circle cx="46" cy="30" r="1.6" fill="currentColor"/><circle cx="40" cy="25" r="1.6" fill="currentColor"/>
-    </svg>
+    <svg class="hero-icon mb-8" width="84" height="84" viewBox="0 0 40 40"
+     fill="none" aria-hidden="true" data-aos="zoom-in" data-aos-duration="900">
+  <rect width="40" height="40" rx="10" fill="#0F172A"/>
+  <path d="M12 29V17C12 12.58 15.58 9 20 9C24.42 9 28 12.58 28 17V24"
+        stroke="#06B6D4" stroke-width="3" stroke-linecap="round"/>
+  <path d="M15 18H25M15 23H25"
+        stroke="#38BDF8" stroke-width="2" stroke-linecap="round"/>
+  <circle cx="28" cy="29" r="3.5" fill="#F43F5E"/>
+</svg>
     <h1 id="heroTitle" class="glow-text text-4xl md:text-6xl font-bold tracking-tight leading-tight mb-6" data-aos="fade-up" data-aos-delay="120">
       Find Cas13 guides that hit open RNA
     </h1>
@@ -270,17 +281,25 @@
       </div>
       <div id="parsStatusDiv" class="mb-4"></div>
     </div>
+  </section>
 
-    <div id="chatSection" class="hidden">
-      <div class="sub-label mt-6 pt-5 border-t" style="border-color:var(--line)">Ask the AI agent about your results</div>
-      <div id="chatBox" class="chat-box"></div>
-      <div class="chat-input-row">
-        <input type="text" id="chatInput" class="chat-input"
-               placeholder="For example: why is guide 1 ranked highest?"
-               onkeypress="if(event.key==='Enter') sendChat()">
-        <button class="btn chat-send" type="button" id="chatSendBtn" onclick="sendChat()">Send</button>
-      </div>
+  <!-- CHAT: always visible; unlocks as soon as an analysis has run -->
+  <section id="chatCard" class="card" data-aos="fade-up">
+    <h2>Ask the AI assistant <small id="chatStatus">Run an analysis to unlock</small></h2>
+    <div id="quickQuestions" class="flex flex-wrap gap-2 mb-4">
+      <button class="btn sample-btn" type="button" data-q="Which guide should I test first, and why?" onclick="askQuick(this)">Which guide first?</button>
+      <button class="btn sample-btn" type="button" data-q="Why do many guides show no_data in the PARS column?" onclick="askQuick(this)">Why no_data?</button>
+      <button class="btn sample-btn" type="button" data-q="What do the Score, SS% and Seed Conf columns mean?" onclick="askQuick(this)">Explain the columns</button>
+      <button class="btn sample-btn" type="button" data-q="How reliable is this prediction, and what should I do before ordering guides?" onclick="askQuick(this)">How reliable is this?</button>
     </div>
+    <div id="chatBox" class="chat-box"></div>
+    <div class="chat-input-row">
+      <input type="text" id="chatInput" class="chat-input" disabled
+             placeholder="Run an analysis first, then ask a question here"
+             onkeypress="if(event.key==='Enter') sendChat()">
+      <button class="btn chat-send" type="button" id="chatSendBtn" disabled onclick="sendChat()">Send</button>
+    </div>
+    <p class="mt-3 text-xs" style="color:var(--faint)">Answers use only the results on this page. The assistant can be wrong, so check important details in the table.</p>
   </section>
 
 </main>
@@ -332,6 +351,8 @@ function clearAll() {
   parsValidation = null;
   chatHistory    = [];
   grnaData       = [];
+  setChatEnabled(false);
+  resetChat('Hello! Run an analysis and I will help explain the results.');
 }
 
 // ─── TOOL SELECTOR ────────────────────────────────────────────────
@@ -438,6 +459,10 @@ async function runAnalysis() {
     renderStructure(result);
     renderGRNAs(result);
     renderEvidence(result);
+    setChatEnabled(true);
+    resetChat('Hello! I can see your ' + result.stats.grnas_found + ' guide candidates' +
+      (result.evidence && result.evidence.tier === 'experimental_data_available' ? ' and their experimental PARS check' : ' (prediction only, no experimental data for this sequence)') +
+      '. Ask me anything about them, or use one of the quick questions above.');
 
   } catch(e) {
     showError('Cannot connect to backend. Make sure Python server is running: python app_py_final.py');
@@ -452,7 +477,6 @@ async function runAIAgent() {
   aiCard.classList.remove('hidden');
   document.getElementById('aiLoading').classList.remove('hidden');
   document.getElementById('aiAnalysisPanels').classList.add('hidden');
-  document.getElementById('chatSection').classList.add('hidden');
   document.getElementById('aiLoadingMsg').textContent =
     'Validating gRNAs against PARS database...';
 
@@ -493,13 +517,6 @@ async function runAIAgent() {
     if (parsValidation && parsValidation.status === 'success') {
       updateTableWithPARS(parsValidation);
     }
-
-    // Show chat
-    document.getElementById('chatSection').classList.remove('hidden');
-    addChatMessage('agent',
-      `I have analyzed your ${currentResult.stats.grnas_found} gRNA candidates using both computational structure prediction and PARS experimental data. ` +
-      `Ask me anything about the results!`
-    );
 
   } catch(e) {
     showAIError(`Error: ${e.message}`);
@@ -655,6 +672,26 @@ function showAIError(msg) {
 }
 
 // ─── CHAT ─────────────────────────────────────────────────────────
+function setChatEnabled(on) {
+  document.getElementById('chatInput').disabled   = !on;
+  document.getElementById('chatSendBtn').disabled = !on;
+  document.querySelectorAll('#quickQuestions button').forEach(function (b) { b.disabled = !on; });
+  document.getElementById('chatInput').placeholder = on ? 'For example: why is guide 1 ranked highest?' : 'Run an analysis first, then ask a question here';
+  document.getElementById('chatStatus').textContent = on ? 'Ready. Answers use your results.' : 'Run an analysis to unlock';
+}
+
+function resetChat(greeting) {
+  document.getElementById('chatBox').innerHTML = '';
+  chatHistory = [];
+  if (greeting) addChatMessage('agent', greeting);
+}
+
+function askQuick(btn) {
+  var input = document.getElementById('chatInput');
+  input.value = btn.getAttribute('data-q');
+  sendChat();
+}
+
 async function sendChat() {
   const input   = document.getElementById('chatInput');
   const sendBtn = document.getElementById('chatSendBtn');
@@ -686,7 +723,7 @@ async function sendChat() {
     });
 
     const data = await resp.json();
-    const answer = data.answer || 'Could not get response.';
+    const answer = data.answer || data.error || 'No answer came back. If this keeps happening, check that GROQ_API_KEY is set on the server.';
 
     // Remove typing indicator and add real answer
     removeMessage(typingId);
@@ -695,7 +732,7 @@ async function sendChat() {
 
   } catch(e) {
     removeMessage(typingId);
-    addChatMessage('agent', 'Error connecting to AI agent. Check that app.py is running.');
+    addChatMessage('agent', 'Could not reach the backend. Check the server address at the top of index.html and that the Railway service is running.');
   } finally {
     sendBtn.disabled = false;
     input.focus();
@@ -703,6 +740,8 @@ async function sendChat() {
 }
 
 let msgCounter = 0;
+try { setChatEnabled(false); resetChat('Hello! Run an analysis and I will help explain the results.'); } catch (e) {}
+
 function addChatMessage(role, content, isTyping=false) {
   const chatBox = document.getElementById('chatBox');
   const msgId   = `msg-${++msgCounter}`;
