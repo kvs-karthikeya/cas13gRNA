@@ -37,11 +37,22 @@ RUN RNAplfold --version && echo "RNAplfold OK"
 ARG RNASTRUCTURE_VERSION=6.5
 RUN set -e; \
     for host in rna.urmc.rochester.edu rna2.urmc.rochester.edu rna1.urmc.rochester.edu; do \
-      if wget -q "https://${host}/Releases/${RNASTRUCTURE_VERSION}/RNAstructureLinuxTextInterfaces64bit.tgz" -O /tmp/rnastructure.tgz \
-         && tar -xzf /tmp/rnastructure.tgz -C /opt/ \
-         && test -x /opt/RNAstructure/exe/Fold; then \
-        echo "RNAstructure ${RNASTRUCTURE_VERSION} installed from ${host}"; break; \
+      echo "Trying ${host}..."; \
+      if timeout 45s wget --timeout=15 --tries=1 \
+          "https://${host}/Releases/6.5/RNAstructureLinuxTextInterfaces64bit.tgz" \
+          -O /tmp/rnastructure.tgz \
+          && tar -xzf /tmp/rnastructure.tgz -C /opt/ \
+          && test -x /opt/RNAstructure/exe/Fold; then \
+        echo "RNAstructure 6.5 installed from ${host}"; \
+        break; \
       fi; \
+      rm -f /tmp/rnastructure.tgz; \
+    done; \
+    if test -x /opt/RNAstructure/exe/Fold; then \
+      echo "RNAstructure available"; \
+    else \
+      echo "RNAstructure unavailable; using ViennaRNA RNAfold fallback"; \
+    fi \
     done; \
     rm -f /tmp/rnastructure.tgz; \
     test -x /opt/RNAstructure/exe/Fold || echo "WARNING: RNAstructure not installed; the app will use RNAfold"
