@@ -27,28 +27,29 @@ RUN apt-get update && apt-get install -y \
     vienna-rna \
     && rm -rf /var/lib/apt/lists/*
 
-# VIENNARNA
+# VIENNARNA (required: RNAfold folds, RNAplfold gives seed confidence for long sequences)
 RUN RNAfold --version && echo "RNAfold OK"
 RUN RNAplfold --version && echo "RNAplfold OK"
 
-# RNASTRUCTURE 64-BIT TEXT INTERFACES
-ARG RNASTRUCTURE_VERSION=6.6
-
-RUN wget -q \
-    "https://rna1.urmc.rochester.edu/Releases/current/RNAstructureLinuxTextInterfaces64bit.tgz" \
-    -O /tmp/rnastructure.tgz \
-    && tar -xzf /tmp/rnastructure.tgz -C /opt/ \
-    && rm /tmp/rnastructure.tgz \
-    && test -x /opt/RNAstructure/exe/Fold \
-    && echo "RNAstructure Fold executable installed"
+# RNASTRUCTURE 64-BIT TEXT INTERFACES (optional)
+# Tries several official mirrors. If none works the build still succeeds with a clear warning
+# and the app uses RNAfold instead; a temporary outage of the Rochester server must not stop a deploy.
+ARG RNASTRUCTURE_VERSION=6.5
+RUN set -e; \
+    for host in rna.urmc.rochester.edu rna2.urmc.rochester.edu rna1.urmc.rochester.edu; do \
+      if wget -q "https://${host}/Releases/${RNASTRUCTURE_VERSION}/RNAstructureLinuxTextInterfaces64bit.tgz" -O /tmp/rnastructure.tgz \
+         && tar -xzf /tmp/rnastructure.tgz -C /opt/ \
+         && test -x /opt/RNAstructure/exe/Fold; then \
+        echo "RNAstructure ${RNASTRUCTURE_VERSION} installed from ${host}"; break; \
+      fi; \
+    done; \
+    rm -f /tmp/rnastructure.tgz; \
+    test -x /opt/RNAstructure/exe/Fold || echo "WARNING: RNAstructure not installed; the app will use RNAfold"
 
 ENV PATH="/opt/RNAstructure/exe:${PATH}"
 ENV DATAPATH="/opt/RNAstructure/data_tables"
 
-# Verify RNAstructure
-RUN command -v Fold && test -d "$DATAPATH"
-
-# LINEARFOLD
+# LINEARFOLD (optional: the app falls back to windowed folding if it is missing)
 RUN git clone --depth=1 \
     https://github.com/LinearFold/LinearFold.git \
     /opt/linearfold \
@@ -87,4 +88,3 @@ RUN sed -i 's/\r$//' /start.sh \
     && chmod +x /start.sh
 
 CMD ["/start.sh"]
-
