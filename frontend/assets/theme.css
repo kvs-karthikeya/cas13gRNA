@@ -29,6 +29,14 @@
   --glow-text: 0 0 28px rgba(10, 10, 10, 0.16);
   --glow-icon: drop-shadow(0 0 14px rgba(10, 10, 10, 0.28));
   --ambient: radial-gradient(60% 45% at 50% 0%, rgba(10, 10, 10, 0.06), transparent 72%);
+
+  /* structure colours: green = single-stranded, red = double-stranded; stronger = more certain */
+  --ss1: #15803d; --ss1-t: #ffffff; --ss1-g: rgba(21, 128, 61, .50);
+  --ss2: #4ade80; --ss2-t: #052e16; --ss2-g: rgba(34, 197, 94, .35);
+  --ss3: #bbf7d0; --ss3-t: #14532d;
+  --ds3: #fecaca; --ds3-t: #7f1d1d;
+  --ds2: #f87171; --ds2-t: #450a0a; --ds2-g: rgba(239, 68, 68, .35);
+  --ds1: #b91c1c; --ds1-t: #ffffff; --ds1-g: rgba(185, 28, 28, .50);
 }
 
 .dark {                                   /* BLACK theme */
@@ -52,6 +60,13 @@
   --glow-text: 0 0 26px rgba(255, 255, 255, 0.38);
   --glow-icon: drop-shadow(0 0 16px rgba(255, 255, 255, 0.5));
   --ambient: radial-gradient(60% 45% at 50% 0%, rgba(255, 255, 255, 0.075), transparent 72%);
+
+  --ss1: #4ade80; --ss1-t: #04210f; --ss1-g: rgba(74, 222, 128, .75);
+  --ss2: #22c55e; --ss2-t: #04210f; --ss2-g: rgba(34, 197, 94, .40);
+  --ss3: #166534; --ss3-t: #d1fae5;
+  --ds3: #5b1a1a; --ds3-t: #fecaca;
+  --ds2: #b91c1c; --ds2-t: #ffffff; --ds2-g: rgba(239, 68, 68, .40);
+  --ds1: #f87171; --ds1-t: #2d0707; --ds1-g: rgba(248, 113, 113, .75);
 }
 
 html { color-scheme: light; scroll-behavior: smooth; }
@@ -225,14 +240,14 @@ textarea.field::placeholder, .chat-input::placeholder { color: var(--faint); }
 .seq-display { line-height: 2.5; }
 .struct-display { color: var(--muted); margin-top: 10px; line-height: 1.7; }
 .nt { border-radius: 3px; padding: 1px 3px; cursor: default; display: inline-block; line-height: 1.5; }
-/* single-stranded = bright, double-stranded = dim (swapped automatically by theme) */
-.ss-vh, .ss-noprob { background: var(--fg); color: var(--bg); box-shadow: 0 0 10px color-mix(in srgb, var(--fg) 55%, transparent); }
-.ss-h  { background: color-mix(in srgb, var(--fg) 78%, var(--bg)); color: var(--bg); }
-.ss-m  { background: color-mix(in srgb, var(--fg) 55%, var(--bg)); color: var(--bg); }
+/* green = single-stranded, red = double-stranded; stronger and brighter = more certain; the strongest glow */
+.ss-vh { background: var(--ss1); color: var(--ss1-t); box-shadow: 0 0 12px var(--ss1-g); }
+.ss-h, .ss-noprob { background: var(--ss2); color: var(--ss2-t); box-shadow: 0 0 8px var(--ss2-g); }
+.ss-m  { background: var(--ss3); color: var(--ss3-t); }
 .unc   { background: transparent; color: var(--fg-2); outline: 1px dashed var(--muted); outline-offset: -1px; }
-.ds-m  { background: color-mix(in srgb, var(--fg) 14%, var(--bg)); color: var(--fg-2); }
-.ds-h, .ds-noprob { background: color-mix(in srgb, var(--fg) 8%, var(--bg)); color: var(--muted); }
-.ds-vh { background: transparent; color: var(--faint); border: 1px solid var(--line); }
+.ds-m  { background: var(--ds3); color: var(--ds3-t); }
+.ds-h, .ds-noprob { background: var(--ds2); color: var(--ds2-t); box-shadow: 0 0 8px var(--ds2-g); }
+.ds-vh { background: var(--ds1); color: var(--ds1-t); box-shadow: 0 0 12px var(--ds1-g); }
 .energy-display, .tool-used-display { margin-top: 12px; font-size: 12px; color: var(--muted); }
 .energy-display span, .tool-used-display span { color: var(--fg); font-weight: 700; }
 
@@ -251,11 +266,11 @@ textarea.field::placeholder, .chat-input::placeholder { color: var(--faint); }
   font-size: 11px; padding: 5px 12px; border-radius: 999px; display: inline-flex; align-items: center; gap: 8px;
   border: 1px solid var(--line-strong); color: var(--fg-2); background: var(--well);
 }
-.region-tag.ss-tag { border-color: var(--fg); color: var(--fg); }
+.region-tag.ss-tag { border-color: var(--ss2); color: var(--fg); }
 .conf-badge { font-size: 10px; padding: 1px 7px; border-radius: 999px; font-weight: 700; border: 1px solid var(--line-strong); }
-.conf-vh { background: var(--fg); color: var(--bg); border-color: var(--fg); }
-.conf-h  { background: color-mix(in srgb, var(--fg) 75%, var(--bg)); color: var(--bg); border-color: transparent; }
-.conf-m  { background: color-mix(in srgb, var(--fg) 45%, var(--bg)); color: var(--bg); border-color: transparent; }
+.conf-vh { background: var(--ss1); color: var(--ss1-t); border-color: transparent; box-shadow: 0 0 10px var(--ss1-g); }
+.conf-h  { background: var(--ss2); color: var(--ss2-t); border-color: transparent; box-shadow: 0 0 7px var(--ss2-g); }
+.conf-m  { background: var(--ss3); color: var(--ss3-t); border-color: transparent; }
 .conf-l  { background: transparent; color: var(--fg-2); }
 .conf-vl { background: transparent; color: var(--faint); border-style: dashed; }
 
@@ -331,7 +346,5 @@ td.mono { font-size: 12px; color: var(--fg); }
 
 /* ---------- Fallback for browsers without color-mix() (older than 2023) ---------- */
 @supports not (color: color-mix(in srgb, white, black)) {
-  .ss-h, .ss-m, .conf-h, .conf-m { background: var(--fg); color: var(--bg); }
-  .ds-m, .ds-h, .ds-noprob { background: var(--well); color: var(--fg-2); }
   .conf-bar { background: var(--muted); }
 }
